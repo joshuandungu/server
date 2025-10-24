@@ -315,4 +315,57 @@ userRouter.get("/api/best-sellers", auth, async (req, res) => {
     }
 });
 
+// Get shop owner data for buyers
+userRouter.get("/api/shop-owner/:sellerId", auth, async (req, res) => {
+    try {
+        const { sellerId } = req.params;
+        const shopOwner = await User.findById(sellerId);
+        if (!shopOwner) {
+            return res.status(404).json({ msg: "Shop not found" });
+        }
+        res.json(shopOwner);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Get shop products for buyers
+userRouter.get("/api/shop-products/:sellerId", auth, async (req, res) => {
+    try {
+        const { sellerId } = req.params;
+        const products = await Product.find({ sellerId });
+        res.json(products);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Get shop stats for buyers
+userRouter.get("/api/shop-stats/:sellerId", auth, async (req, res) => {
+    try {
+        const { sellerId } = req.params;
+        const totalProducts = await Product.countDocuments({ sellerId });
+        const orders = await Order.find({ "products.product.sellerId": sellerId, status: 3 });
+        let totalRating = 0;
+        let ratingCount = 0;
+        orders.forEach(order => {
+            order.products.forEach(product => {
+                if (product.product.sellerId.toString() === sellerId && product.rating) {
+                    totalRating += product.rating;
+                    ratingCount++;
+                }
+            });
+        });
+        const avgRating = ratingCount > 0 ? totalRating / ratingCount : 0;
+        const followerCount = await User.countDocuments({ following: sellerId });
+        res.json({
+            totalProducts,
+            avgRating,
+            followerCount
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 module.exports = userRouter;
