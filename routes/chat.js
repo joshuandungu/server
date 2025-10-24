@@ -17,6 +17,43 @@ chatRouter.post('/api/chat/get-or-create', auth, async (req, res) => {
             return res.status(400).json({ msg: 'Receiver ID is required.' });
         }
 
+        // Special handling for admin chats
+        if (receiverId === 'admin') {
+            // For admin chats, use a special chatRoomIdString
+            const chatRoomIdString = `admin_${senderId}`;
+
+            let chatRoom = await ChatRoom.findOne({
+                chatRoomIdString: chatRoomIdString,
+            });
+
+            if (!chatRoom) {
+                // Create a chat room with only the sender as participant (admin is not a real user)
+                chatRoom = new ChatRoom({
+                    chatRoomIdString: chatRoomIdString,
+                    participants: [senderId], // Only the sender
+                    unreadCounts: [
+                        { userId: senderId, count: 0 }
+                    ]
+                });
+                await chatRoom.save();
+            }
+
+            // Populate participant details before sending back
+            await chatRoom.populate({
+                path: 'participants',
+                select: 'name shopName type shopAvatar'
+            });
+
+            // When a user enters a chat, reset their unread count for that room
+            await ChatRoom.updateOne(
+                { _id: chatRoom._id, 'unreadCounts.userId': senderId },
+                { $set: { 'unreadCounts.$.count': 0 } }
+            );
+
+            res.json(chatRoom);
+            return;
+        }
+
         // Generate a consistent chat room ID string for querying or creating
         const ids = [senderId, receiverId];
         ids.sort();

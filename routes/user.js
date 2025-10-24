@@ -257,11 +257,20 @@ userRouter.post("/api/update-profile", auth, async (req, res) => {
     }
 });
 
-// Get top sellers by revenue
+// Get top sellers by revenue (last 30 days)
 userRouter.get("/api/best-sellers", auth, async (req, res) => {
     try {
+        // Calculate the date 30 days ago
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
         const sellers = await Order.aggregate([
-            { $match: { status: 3 } },
+            {
+                $match: {
+                    status: 3, // Delivered orders
+                    orderedAt: { $gte: thirtyDaysAgo.getTime() } // Orders from last 30 days
+                }
+            },
             { $unwind: "$products" },
             {
                 $lookup: {

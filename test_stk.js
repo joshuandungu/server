@@ -1,6 +1,6 @@
 const axios = require("axios");
 
-const API_URL = "http://localhost:5000/api/mpesa/stk-push";
+const API_URL = "https://gas-app-backend-1gjx.onrender.com/api/mpesa/stk-push";
 
 // Replace these values 👇 with your real test values
 const JWT_TOKEN = "12345678"; // From login

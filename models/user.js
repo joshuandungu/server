@@ -27,7 +27,7 @@ const userSchema = mongoose.Schema({
     },
     isEmailVerified: {
         type: Boolean,
-        default: false,
+        default: true,
     },
     emailVerificationCode: {
         type: String,
@@ -45,7 +45,7 @@ const userSchema = mongoose.Schema({
     status: {
         type: String,
         enum: ['pending', 'active', 'suspended', 'deleted'],
-        default: "pending",
+        default: "active",
     },
     shopName: {
         type: String,

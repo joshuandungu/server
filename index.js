@@ -72,13 +72,14 @@ io.on('connection', (socket) => {
 
     socket.on('sendMessage', async (data) => {
         try {
-            const { chatRoomId, senderId, receiverId, text, tempId } = data;
+            const { chatRoomId, senderId, receiverId, text, tempId, imageUrl } = data;
 
             // 1. Create and save the message
             const newMessage = new Message({
                 chatRoomId,
                 senderId,
                 text,
+                imageUrl,
             });
             const savedMessage = await newMessage.save();
 

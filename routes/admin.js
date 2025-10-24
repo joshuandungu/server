@@ -1,15 +1,13 @@
-
-
-
-const express = require("express");
+yconst express = require("express");
 const { Product } = require("../models/product");
 const admin = require("../middlewares/admin");
 const Order = require("../models/order");
 const SellerRequest = require("../models/sellerRequest");
-const bcryptjs = require('bcryptjs');
-const adminRouter = express.Router();
+const bcryptjs = require("bcryptjs");
 const User = require("../models/user");
 const AboutApp = require("../models/aboutApp");
+
+const adminRouter = express.Router();
 
 // DEV ONLY: Create admin user
 adminRouter.post('/admin/create-admin', async (req, res) => {
@@ -55,6 +53,7 @@ adminRouter.post('/admin/login', async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
+
 // Admin adds a new product
 adminRouter.post("/admin/add-product", admin, async (req, res) => {
     try {
@@ -84,6 +83,30 @@ adminRouter.get("/admin/products", admin, async (req, res) => {
     }
 });
 
+// Public route to get all products for buyers
+adminRouter.get("/api/products", async (req, res) => {
+    try {
+        const query = {};
+        if (req.query.category) {
+            query.category = req.query.category;
+        }
+        const products = await Product.find(query).populate('sellerId', 'shopName shopAvatar phoneNumber');
+        res.json(products);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Public route to get all active sellers for buyers
+adminRouter.get("/api/sellers", async (req, res) => {
+    try {
+        const sellers = await User.find({ type: "seller", status: "active" });
+        res.json(sellers);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Admin deletes a product
 adminRouter.delete("/admin/product/:id", admin, async (req, res) => {
     try {
@@ -98,8 +121,6 @@ adminRouter.delete("/admin/product/:id", admin, async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
-
-
 
 // Admin gets all pending seller requests
 adminRouter.get("/admin/seller-requests", admin, async (req, res) => {
@@ -136,6 +157,7 @@ adminRouter.post("/admin/process-seller-request", admin, async (req, res) => {
                 latitude: request.latitude,
                 longitude: request.longitude,
                 phoneNumber: request.phoneNumber,
+                status: "active",
             });
         }
 
@@ -159,6 +181,17 @@ adminRouter.get("/admin/sellers", admin, async (req, res) => {
 adminRouter.get("/admin/users", admin, async (req, res) => {
     try {
         const users = await User.find({ type: "user" });
+        res.json(users);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Public route to get all users for chat (admin only)
+adminRouter.get("/api/users", admin, async (req, res) => {
+    try {
+        const users = await User.find({ type: { $in: ["user", "seller"] } })
+            .select('name shopName type shopAvatar email phoneNumber');
         res.json(users);
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -298,6 +331,7 @@ adminRouter.get("/admin/best-sellers", admin, async (req, res) => {
         // Base query để lấy các đơn hàng đã delivered
         let matchQuery = {
             status: 3,
+            cancelled: false,
         };
 
         // Nếu có tháng và năm, thêm filter theo thời gian
@@ -335,7 +369,7 @@ adminRouter.get("/admin/best-sellers", admin, async (req, res) => {
                     shopAvatar: { $first: "$seller.shopAvatar" },
                     totalRevenue: {
                         $sum: {
-                            $multiply: ["$products.quantity", "$products.product.price"],
+                            $multiply: ["$products.quantity", "$products.product.finalPrice"],
                         },
                     },
                     totalOrders: { $sum: 1 },
@@ -352,6 +386,67 @@ adminRouter.get("/admin/best-sellers", admin, async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
+
+// Get sales overview with filters
+adminRouter.get("/admin/sales-overview", admin, async (req, res) => {
+    try {
+        const { startDate, endDate, category } = req.query;
+
+        // Base query để lấy các đơn hàng đã delivered
+        let matchQuery = {
+            status: 3,
+            cancelled: false,
+        };
+
+        // Nếu có date range, thêm filter theo thời gian
+        if (startDate && endDate) {
+            matchQuery.orderedAt = {
+                $gte: parseInt(startDate),
+                $lte: parseInt(endDate),
+            };
+        }
+
+        // Thêm điều kiện category nếu có
+        const categoryMatch = category && category !== 'All Categories'
+            ? { "products.product.category": category }
+            : {};
+
+        const salesData = await Order.aggregate([
+            { $match: matchQuery },
+            { $unwind: "$products" },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "products.product.sellerId",
+                    foreignField: "_id",
+                    as: "seller",
+                },
+            },
+            { $unwind: "$seller" },
+            { $match: categoryMatch },
+            {
+                $group: {
+                    _id: "$seller._id",
+                    shopName: { $first: "$seller.shopName" },
+                    shopAvatar: { $first: "$seller.shopAvatar" },
+                    revenue: {
+                        $sum: {
+                            $multiply: ["$products.quantity", "$products.product.finalPrice"],
+                        },
+                    },
+                    orders: { $sum: 1 },
+                },
+            },
+            { $sort: { revenue: -1 } },
+        ]);
+
+        res.json(salesData);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+
 
 // Get all orders for admin
 adminRouter.get("/admin/orders", admin, async (req, res) => {
@@ -392,6 +487,10 @@ adminRouter.get("/api/about-app", async (req, res) => {
             version: aboutApp.version,
             description: aboutApp.description,
             developer: aboutApp.developer,
+            contactEmail: aboutApp.contactEmail,
+            contactPhone: aboutApp.contactPhone,
+            supportEmail: aboutApp.supportEmail,
+            address: aboutApp.address,
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -401,7 +500,7 @@ adminRouter.get("/api/about-app", async (req, res) => {
 // Update about app information (admin only)
 adminRouter.post("/admin/update-about-app", admin, async (req, res) => {
     try {
-        const { appName, version, description, developer } = req.body;
+        const { appName, version, description, developer, contactEmail, contactPhone, supportEmail, address } = req.body;
         let aboutApp = await AboutApp.findOne();
         if (!aboutApp) {
             aboutApp = new AboutApp();
@@ -410,8 +509,116 @@ adminRouter.post("/admin/update-about-app", admin, async (req, res) => {
         aboutApp.version = version || aboutApp.version;
         aboutApp.description = description || aboutApp.description;
         aboutApp.developer = developer || aboutApp.developer;
+        aboutApp.contactEmail = contactEmail || aboutApp.contactEmail;
+        aboutApp.contactPhone = contactPhone || aboutApp.contactPhone;
+        aboutApp.supportEmail = supportEmail || aboutApp.supportEmail;
+        aboutApp.address = address || aboutApp.address;
         await aboutApp.save();
         res.json({ msg: 'About app information updated successfully' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+adminRouter.get("/admin/vendor-sales", admin, async (req, res) => {
+    try {
+        const { startDate, endDate, category } = req.query;
+
+        let matchQuery = {
+            status: 3, // Delivered
+            cancelled: { $ne: true }
+        };
+
+        if (startDate && endDate) {
+            matchQuery.orderedAt = {
+                $gte: parseInt(startDate),
+                $lte: parseInt(endDate),
+            };
+        }
+
+        const categoryMatch = category && category !== 'All Categories'
+            ? { "products.product.category": category }
+            : {};
+
+        const vendorSales = await Order.aggregate([
+            // 1. Find completed orders
+            { $match: matchQuery },
+            // 2. Deconstruct the products array
+            { $unwind: "$products" },
+            // 3. Group by seller and order to get per-order revenue for each seller
+            {
+                $group: {
+                    _id: { sellerId: "$products.product.sellerId", orderId: "$_id" },
+                    revenue: { $sum: { $multiply: ["$products.quantity", "$products.product.finalPrice"] } },
+                }
+            },
+            { $match: categoryMatch },
+            // 4. Group by seller to aggregate total revenue and count distinct orders
+            {
+                $group: {
+                    _id: "$_id.sellerId",
+                    totalRevenue: { $sum: "$revenue" },
+                    completedOrders: { $sum: 1 }
+                }
+            },
+            // 5. Look up seller details
+            {
+                $lookup: { from: "users", localField: "_id", foreignField: "_id", as: "sellerInfo" }
+            },
+            { $unwind: "$sellerInfo" },
+            { $sort: { totalRevenue: -1 } },
+            // 6. Project the final fields
+            {
+                $project: {
+                    _id: 0,
+                    sellerId: "$_id",
+                    shopName: "$sellerInfo.shopName",
+                    shopAvatar: "$sellerInfo.shopAvatar",
+                    totalRevenue: "$totalRevenue",
+                    completedOrders: "$completedOrders"
+                }
+            }
+        ]);
+        res.json(vendorSales);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Get category-wise sales for admin
+adminRouter.get("/admin/category-sales", admin, async (req, res) => {
+    try {
+        const sales = await Order.aggregate([
+            // 1. Match delivered orders
+            {
+                $match: {
+                    status: 3, // Delivered
+                    cancelled: { $ne: true }
+                }
+            },
+            // 2. Unwind the products array
+            { $unwind: "$products" },
+            // 3. Group by product category and sum up the earnings
+            {
+                $group: {
+                    _id: "$products.product.category",
+                    earning: {
+                        $sum: {
+                            $multiply: ["$products.quantity", "$products.product.finalPrice"],
+                        },
+                    },
+                },
+            },
+            // 4. Project the fields to match the 'Sales' model on the frontend
+            {
+                $project: {
+                    _id: 0,
+                    label: "$_id",
+                    earning: "$earning",
+                },
+            },
+        ]);
+        res.json(sales);
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
