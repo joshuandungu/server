@@ -97,16 +97,6 @@ adminRouter.get("/api/products", async (req, res) => {
     }
 });
 
-// Public route to get all active sellers for buyers
-adminRouter.get("/api/sellers", async (req, res) => {
-    try {
-        const sellers = await User.find({ type: "seller", status: "active" });
-        res.json(sellers);
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
 // Admin deletes a product
 adminRouter.delete("/admin/product/:id", admin, async (req, res) => {
     try {

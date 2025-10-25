@@ -37,7 +37,6 @@ app.use(cors({
 
 app.use(express.json());
 app.use(authRouter);
-app.use(sellerRouter);
 app.use('/seller', sellerRouter);
 app.use(adminRouter);
 app.use(productRouter);

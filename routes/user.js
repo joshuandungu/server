@@ -341,7 +341,7 @@ userRouter.get("/api/shop-products/:sellerId", async (req, res) => {
 });
 
 // Get shop stats for buyers
-userRouter.get("/api/shop-stats/:sellerId", auth, async (req, res) => {
+userRouter.get("/api/shop-stats/:sellerId", async (req, res) => {
     try {
         const { sellerId } = req.params;
         const totalProducts = await Product.countDocuments({ sellerId });
@@ -367,5 +367,28 @@ userRouter.get("/api/shop-stats/:sellerId", auth, async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
+
+// Public route to get all active sellers for buyers
+userRouter.get("/api/sellers", async (req, res) => {
+    try {
+        const { top } = req.query;
+
+        if (top === 'true') {
+            // Logic to get top sellers (e.g., by average rating)
+            const topSellers = await User.find({ type: "seller", status: "active" })
+                .sort({ avgRating: -1 }) // Assuming you have an avgRating field
+                .limit(10);
+            return res.json(topSellers);
+        }
+
+        // Default: get all active sellers
+        const sellers = await User.find({ type: "seller", status: "active" });
+        res.json(sellers);
+
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 
 module.exports = userRouter;

@@ -3,6 +3,7 @@ const seller = require("../middlewares/seller");
 const Order = require("../models/order");
 const { Product } = require("../models/product");
 const User = require("../models/user");
+const mongoose = require("mongoose");
 
 const sellerRouter = express.Router();
 
@@ -10,6 +11,7 @@ const sellerRouter = express.Router();
 sellerRouter.get("/analytics", seller, async (req, res) => {
     try {
         const sellerId = req.user;
+        let totalEarnings = 0;
 
         const sales = await Order.aggregate([
             // 1. Match delivered orders
@@ -24,7 +26,7 @@ sellerRouter.get("/analytics", seller, async (req, res) => {
             // 3. Filter for products belonging to the current seller
             {
                 $match: {
-                    "products.product.sellerId": sellerId,
+                    "products.product.sellerId": new mongoose.Types.ObjectId(sellerId),
                 },
             },
             // 4. Group by product category and sum up the earnings
@@ -47,7 +49,13 @@ sellerRouter.get("/analytics", seller, async (req, res) => {
                 },
             },
         ]);
-        res.json(sales);
+
+        // Calculate total earnings from the sales data
+        if (sales.length > 0) {
+            totalEarnings = sales.reduce((sum, item) => sum + item.earning, 0);
+        }
+
+        res.json({ categoryData: sales, totalEarnings });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
