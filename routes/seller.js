@@ -64,6 +64,7 @@ sellerRouter.post("/seller/add-product", seller, async (req, res) => {
             quantity,
             price,
             category,
+            finalPrice: price, // Set finalPrice to price on creation
             sellerId: req.user,
         });
         product = await product.save();
