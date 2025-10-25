@@ -316,7 +316,7 @@ userRouter.get("/api/best-sellers", auth, async (req, res) => {
 });
 
 // Get shop owner data for buyers
-userRouter.get("/api/shop-owner/:sellerId", auth, async (req, res) => {
+userRouter.get("/api/shop-owner/:sellerId", async (req, res) => {
     try {
         const { sellerId } = req.params;
         const shopOwner = await User.findById(sellerId);
