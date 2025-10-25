@@ -7,7 +7,7 @@ const User = require("../models/user");
 const sellerRouter = express.Router();
 
 // Get seller analytics
-sellerRouter.get("/seller/analytics", seller, async (req, res) => {
+sellerRouter.get("/analytics", seller, async (req, res) => {
     try {
         const sellerId = req.user;
 
@@ -54,7 +54,7 @@ sellerRouter.get("/seller/analytics", seller, async (req, res) => {
 });
 
 // Add product
-sellerRouter.post("/seller/add-product", seller, async (req, res) => {
+sellerRouter.post("/add-product", seller, async (req, res) => {
     try {
         const { name, description, images, quantity, price, category } = req.body;
         let product = new Product({
@@ -75,7 +75,7 @@ sellerRouter.post("/seller/add-product", seller, async (req, res) => {
 });
 
 // Get products for seller
-sellerRouter.get("/seller/get-products", seller, async (req, res) => {
+sellerRouter.get("/get-products", seller, async (req, res) => {
     try {
         const products = await Product.find({ sellerId: req.user });
         res.json(products);
@@ -85,7 +85,7 @@ sellerRouter.get("/seller/get-products", seller, async (req, res) => {
 });
 
 // Delete product
-sellerRouter.post("/seller/delete-product", seller, async (req, res) => {
+sellerRouter.post("/delete-product", seller, async (req, res) => {
     try {
         const { id } = req.body;
         let product = await Product.findById(id);
@@ -103,7 +103,7 @@ sellerRouter.post("/seller/delete-product", seller, async (req, res) => {
 });
 
 // Update product
-sellerRouter.post("/seller/update-product", seller, async (req, res) => {
+sellerRouter.post("/update-product", seller, async (req, res) => {
     try {
         const { id, name, description, price, quantity, category, images } = req.body;
         let product = await Product.findById(id);
@@ -127,7 +127,7 @@ sellerRouter.post("/seller/update-product", seller, async (req, res) => {
 });
 
 // Get orders for seller
-sellerRouter.get("/seller/get-orders", seller, async (req, res) => {
+sellerRouter.get("/get-orders", seller, async (req, res) => {
     try {
         const orders = await Order.find({ "products.product.sellerId": req.user })
             .populate('products.product')
@@ -140,7 +140,7 @@ sellerRouter.get("/seller/get-orders", seller, async (req, res) => {
 });
 
 // Change order status
-sellerRouter.post("/seller/change-order-status", seller, async (req, res) => {
+sellerRouter.post("/change-order-status", seller, async (req, res) => {
     try {
         const { id, status } = req.body;
         let order = await Order.findById(id);
@@ -163,7 +163,7 @@ sellerRouter.post("/seller/change-order-status", seller, async (req, res) => {
 });
 
 // Update payment status
-sellerRouter.post("/seller/update-payment-status", seller, async (req, res) => {
+sellerRouter.post("/update-payment-status", seller, async (req, res) => {
     try {
         const { id, paymentStatus } = req.body;
         let order = await Order.findById(id);
@@ -186,7 +186,7 @@ sellerRouter.post("/seller/update-payment-status", seller, async (req, res) => {
 });
 
 // Get shop data
-sellerRouter.get("/seller/shop-data/:sellerId", seller, async (req, res) => {
+sellerRouter.get("/shop-data/:sellerId", seller, async (req, res) => {
     try {
         const { sellerId } = req.params;
         const shopOwner = await User.findById(sellerId);
@@ -201,7 +201,7 @@ sellerRouter.get("/seller/shop-data/:sellerId", seller, async (req, res) => {
 });
 
 // Get shop owner (for sellers viewing other sellers)
-sellerRouter.get("/seller/shop-owner/:sellerId", seller, async (req, res) => {
+sellerRouter.get("/shop-owner/:sellerId", seller, async (req, res) => {
     try {
         const { sellerId } = req.params;
         const shopOwner = await User.findById(sellerId);
@@ -215,7 +215,7 @@ sellerRouter.get("/seller/shop-owner/:sellerId", seller, async (req, res) => {
 });
 
 // Get shop stats (for sellers viewing other sellers)
-sellerRouter.get("/seller/shop-stats/:sellerId", seller, async (req, res) => {
+sellerRouter.get("/shop-stats/:sellerId", seller, async (req, res) => {
     try {
         const { sellerId } = req.params;
         const totalProducts = await Product.countDocuments({ sellerId });
@@ -243,7 +243,7 @@ sellerRouter.get("/seller/shop-stats/:sellerId", seller, async (req, res) => {
 });
 
 // Follow seller
-sellerRouter.post("/seller/follow", seller, async (req, res) => {
+sellerRouter.post("/follow", seller, async (req, res) => {
     try {
         const { sellerId } = req.body;
         const user = await User.findById(req.user);
@@ -258,7 +258,7 @@ sellerRouter.post("/seller/follow", seller, async (req, res) => {
 });
 
 // Unfollow seller
-sellerRouter.post("/seller/unfollow", seller, async (req, res) => {
+sellerRouter.post("/unfollow", seller, async (req, res) => {
     try {
         const { sellerId } = req.body;
         const user = await User.findById(req.user);
@@ -271,7 +271,7 @@ sellerRouter.post("/seller/unfollow", seller, async (req, res) => {
 });
 
 // Set discount
-sellerRouter.post("/seller/set-discount", seller, async (req, res) => {
+sellerRouter.post("/set-discount", seller, async (req, res) => {
     try {
         const { id, percentage, startDate, endDate } = req.body;
         let product = await Product.findById(id);
@@ -294,7 +294,7 @@ sellerRouter.post("/seller/set-discount", seller, async (req, res) => {
 });
 
 // Get seller address by sellerId
-sellerRouter.get("/seller/address/:sellerId", seller, async (req, res) => {
+sellerRouter.get("/address/:sellerId", seller, async (req, res) => {
     try {
         const { sellerId } = req.params;
         const sellerUser = await User.findById(sellerId);
@@ -308,7 +308,7 @@ sellerRouter.get("/seller/address/:sellerId", seller, async (req, res) => {
 });
 
 // Get addresses of all sellers in cart
-sellerRouter.get("/seller/addresses/cart", seller, async (req, res) => {
+sellerRouter.get("/addresses/cart", seller, async (req, res) => {
     try {
         const user = await User.findById(req.user);
         if (!user) {
