@@ -98,7 +98,7 @@ adminRouter.get("/api/products", async (req, res) => {
 });
 
 // Public route to get all active sellers for buyers
-adminRouter.get("/api/sellers", async (req, res) => {
+adminRouter.get("/sellers", async (req, res) => {
     try {
         const sellers = await User.find({ type: "seller", status: "active" });
         res.json(sellers);
