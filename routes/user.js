@@ -330,7 +330,7 @@ userRouter.get("/api/shop-owner/:sellerId", async (req, res) => {
 });
 
 // Get shop products for buyers
-userRouter.get("/api/shop-products/:sellerId", auth, async (req, res) => {
+userRouter.get("/api/shop-products/:sellerId", async (req, res) => {
     try {
         const { sellerId } = req.params;
         const products = await Product.find({ sellerId });
