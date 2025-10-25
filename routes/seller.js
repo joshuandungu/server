@@ -199,7 +199,7 @@ sellerRouter.get("/seller/shop-data/:sellerId", seller, async (req, res) => {
     }
 });
 
-// Get shop owner
+// Get shop owner (for sellers viewing other sellers)
 sellerRouter.get("/seller/shop-owner/:sellerId", seller, async (req, res) => {
     try {
         const { sellerId } = req.params;
@@ -213,7 +213,7 @@ sellerRouter.get("/seller/shop-owner/:sellerId", seller, async (req, res) => {
     }
 });
 
-// Get shop stats
+// Get shop stats (for sellers viewing other sellers)
 sellerRouter.get("/seller/shop-stats/:sellerId", seller, async (req, res) => {
     try {
         const { sellerId } = req.params;
