@@ -292,4 +292,39 @@ sellerRouter.post("/seller/set-discount", seller, async (req, res) => {
     }
 });
 
+// Get seller address by sellerId
+sellerRouter.get("/seller/address/:sellerId", seller, async (req, res) => {
+    try {
+        const { sellerId } = req.params;
+        const sellerUser = await User.findById(sellerId);
+        if (!sellerUser) {
+            return res.status(404).json({ msg: "Seller not found" });
+        }
+        res.json({ address: sellerUser.address || "" });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Get addresses of all sellers in cart
+sellerRouter.get("/seller/addresses/cart", seller, async (req, res) => {
+    try {
+        const user = await User.findById(req.user);
+        if (!user) {
+            return res.status(404).json({ msg: "User not found" });
+        }
+
+        // Extract unique seller IDs from cart
+        const sellerIds = [...new Set(user.cart.map(item => item.product.sellerId.toString()))];
+
+        // Get addresses for all sellers
+        const sellers = await User.find({ _id: { $in: sellerIds } }).select('address');
+        const addresses = sellers.map(seller => seller.address || "");
+
+        res.json(addresses);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 module.exports = sellerRouter;
