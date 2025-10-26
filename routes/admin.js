@@ -83,20 +83,6 @@ adminRouter.get("/admin/products", admin, async (req, res) => {
     }
 });
 
-// Public route to get all products for buyers
-adminRouter.get("/api/products", async (req, res) => {
-    try {
-        const query = {};
-        if (req.query.category) {
-            query.category = req.query.category;
-        }
-        const products = await Product.find(query).populate('sellerId', 'shopName shopAvatar phoneNumber');
-        res.json(products);
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
 // Admin deletes a product
 adminRouter.delete("/admin/product/:id", admin, async (req, res) => {
     try {

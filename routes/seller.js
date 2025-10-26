@@ -127,6 +127,16 @@ sellerRouter.post("/update-product", seller, async (req, res) => {
         product.quantity = quantity;
         product.category = category;
         product.images = images;
+
+        // Recalculate finalPrice if price is updated
+        product.finalPrice = price; // Default to base price
+        if (product.discount && product.discount.percentage > 0) {
+            const now = new Date();
+            if (now >= product.discount.startDate && now <= product.discount.endDate) {
+                product.finalPrice = product.price * (1 - product.discount.percentage / 100);
+            }
+        }
+
         product = await product.save();
         res.json(product);
     } catch (e) {
@@ -331,6 +341,256 @@ sellerRouter.get("/addresses/cart", seller, async (req, res) => {
         const addresses = sellers.map(seller => seller.address || "");
 
         res.json(addresses);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Get seller dashboard overview data
+sellerRouter.get("/dashboard-overview", seller, async (req, res) => {
+    try {
+        const sellerId = req.user;
+
+        // Get total products count
+        const totalProducts = await Product.countDocuments({ sellerId });
+
+        // Get total orders count (all orders containing seller's products)
+        const totalOrders = await Order.countDocuments({
+            "products.product.sellerId": new mongoose.Types.ObjectId(sellerId)
+        });
+
+        // Get unique customers count (users who have ordered from this seller)
+        const uniqueCustomers = await Order.distinct("userId", {
+            "products.product.sellerId": new mongoose.Types.ObjectId(sellerId)
+        });
+        const totalCustomers = uniqueCustomers.length;
+
+        // Get total revenue (from delivered orders only)
+        const revenueResult = await Order.aggregate([
+            {
+                $match: {
+                    status: 3, // Delivered
+                    cancelled: { $ne: true },
+                    "products.product.sellerId": new mongoose.Types.ObjectId(sellerId)
+                }
+            },
+            { $unwind: "$products" },
+            {
+                $match: {
+                    "products.product.sellerId": new mongoose.Types.ObjectId(sellerId)
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalRevenue: {
+                        $sum: {
+                            $multiply: ["$products.quantity", "$products.product.finalPrice"]
+                        }
+                    }
+                }
+            }
+        ]);
+
+        const totalRevenue = revenueResult.length > 0 ? revenueResult[0].totalRevenue : 0;
+
+        // Calculate conversion rate (orders / unique customers, if customers > 0)
+        const conversionRate = totalCustomers > 0 ? (totalOrders / totalCustomers) : 0;
+
+        res.json({
+            totalProducts,
+            totalOrders,
+            totalCustomers,
+            totalRevenue,
+            conversionRate
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Get enhanced analytics data with time period filtering
+sellerRouter.get("/enhanced-analytics", seller, async (req, res) => {
+    try {
+        const sellerId = req.user;
+        const { period = 'monthly', startDate, endDate } = req.query;
+
+        // Calculate date range based on period
+        let start, end;
+        const now = new Date();
+
+        if (startDate && endDate) {
+            start = new Date(startDate);
+            end = new Date(endDate);
+        } else {
+            switch (period) {
+                case 'daily':
+                    start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+                    break;
+                case 'weekly':
+                    const weekStart = new Date(now);
+                    weekStart.setDate(now.getDate() - now.getDay());
+                    start = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate());
+                    end = new Date(start);
+                    end.setDate(start.getDate() + 7);
+                    break;
+                case 'monthly':
+                    start = new Date(now.getFullYear(), now.getMonth(), 1);
+                    end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+                    break;
+                case 'yearly':
+                    start = new Date(now.getFullYear(), 0, 1);
+                    end = new Date(now.getFullYear() + 1, 0, 1);
+                    break;
+                default:
+                    start = new Date(now.getFullYear(), now.getMonth(), 1);
+                    end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+            }
+        }
+
+        // Get category-wise earnings for the period
+        const categorySales = await Order.aggregate([
+            {
+                $match: {
+                    status: 3, // Delivered
+                    cancelled: { $ne: true },
+                    orderedAt: { $gte: start, $lt: end },
+                    "products.product.sellerId": new mongoose.Types.ObjectId(sellerId)
+                }
+            },
+            { $unwind: "$products" },
+            {
+                $match: {
+                    "products.product.sellerId": new mongoose.Types.ObjectId(sellerId)
+                }
+            },
+            {
+                $group: {
+                    _id: "$products.product.category",
+                    earning: {
+                        $sum: {
+                            $multiply: ["$products.quantity", "$products.product.finalPrice"]
+                        }
+                    }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    label: "$_id",
+                    earning: "$earning"
+                }
+            }
+        ]);
+
+        // Get total earnings for the period
+        const totalEarningsResult = await Order.aggregate([
+            {
+                $match: {
+                    status: 3,
+                    cancelled: { $ne: true },
+                    orderedAt: { $gte: start, $lt: end },
+                    "products.product.sellerId": new mongoose.Types.ObjectId(sellerId)
+                }
+            },
+            { $unwind: "$products" },
+            {
+                $match: {
+                    "products.product.sellerId": new mongoose.Types.ObjectId(sellerId)
+                }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalEarnings: {
+                        $sum: {
+                            $multiply: ["$products.quantity", "$products.product.finalPrice"]
+                        }
+                    },
+                    totalOrders: { $addToSet: "$_id" }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    totalEarnings: 1,
+                    orderCount: { $size: "$totalOrders" }
+                }
+            }
+        ]);
+
+        const totalEarnings = totalEarningsResult.length > 0 ? totalEarningsResult[0].totalEarnings : 0;
+        const totalOrders = totalEarningsResult.length > 0 ? totalEarningsResult[0].orderCount : 0;
+
+        // Get unique customers for the period
+        const uniqueCustomers = await Order.distinct("userId", {
+            status: 3,
+            cancelled: { $ne: true },
+            orderedAt: { $gte: start, $lt: end },
+            "products.product.sellerId": new mongoose.Types.ObjectId(sellerId)
+        });
+
+        const totalCustomers = uniqueCustomers.length;
+        const averageOrderValue = totalOrders > 0 ? totalEarnings / totalOrders : 0;
+        const conversionRate = totalCustomers > 0 ? (totalOrders / totalCustomers) : 0;
+
+        // Generate trend data based on period
+        let dailyEarnings = [];
+        let weeklyEarnings = [];
+        let monthlyEarnings = [];
+
+        if (period === 'monthly') {
+            // Daily earnings for the month
+            const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayStart = new Date(now.getFullYear(), now.getMonth(), day);
+                const dayEnd = new Date(now.getFullYear(), now.getMonth(), day + 1);
+
+                const dayResult = await Order.aggregate([
+                    {
+                        $match: {
+                            status: 3,
+                            cancelled: { $ne: true },
+                            orderedAt: { $gte: dayStart, $lt: dayEnd },
+                            "products.product.sellerId": new mongoose.Types.ObjectId(sellerId)
+                        }
+                    },
+                    { $unwind: "$products" },
+                    {
+                        $match: {
+                            "products.product.sellerId": new mongoose.Types.ObjectId(sellerId)
+                        }
+                    },
+                    {
+                        $group: {
+                            _id: null,
+                            earnings: {
+                                $sum: {
+                                    $multiply: ["$products.quantity", "$products.product.finalPrice"]
+                                }
+                            }
+                        }
+                    }
+                ]);
+
+                dailyEarnings.push(dayResult.length > 0 ? dayResult[0].earnings : 0);
+            }
+        }
+
+        res.json({
+            totalEarnings,
+            categorySales,
+            averageOrderValue,
+            totalOrders,
+            totalCustomers,
+            conversionRate,
+            dailyEarnings,
+            weeklyEarnings,
+            monthlyEarnings,
+            periodStart: start,
+            periodEnd: end
+        });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }

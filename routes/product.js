@@ -4,11 +4,14 @@ const auth = require("../middlewares/auth");
 const { Product } = require("../models/product");
 const ratingSchema = require("../models/rating");
 
-// /api/products?category=TV (lenh get tham so nam trong link)
-productRouter.get("/api/products", auth, async (req, res) => {
+// Public route to get all products for buyers, can be filtered by category
+productRouter.get("/api/products", async (req, res) => {
     try {
-        const products = await Product.find({ category: req.query.category })
-            .populate('sellerId', 'shopName shopAvatar phoneNumber');
+        const query = {};
+        if (req.query.category) {
+            query.category = req.query.category;
+        }
+        const products = await Product.find(query).populate('sellerId', 'shopName shopAvatar phoneNumber');
         res.json(products);
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -73,34 +76,34 @@ productRouter.post("/api/rate-product", auth, async (req, res) => {
 
 productRouter.get("/api/deal-of-day", auth, async (req, res) => {
     try {
-      const now = new Date();
-      
-      // Tìm các sản phẩm đang trong thời gian giảm giá
-      let products = await Product.find({
-        'discount.percentage': { $gt: 0 },
-        'discount.startDate': { $lte: now },
-        'discount.endDate': { $gte: now }
-      })
-      .populate('sellerId', 'shopName shopAvatar phoneNumber')
-      .sort({ 'discount.percentage': -1 }) // Sắp xếp theo phần trăm giảm giá
-      .limit(10); // Lấy 10 sản phẩm giảm giá cao nhất
-  
-      if (products.length < 10) {
-        const remainingCount = 10 - products.length;
-      const highRatedProducts = await Product.find({
-        _id: { $nin: products.map(p => p._id) }, // Exclude already selected products
-      })
-      .populate('sellerId', 'shopName shopAvatar phoneNumber')
-      .sort({ avgRating: -1 })
-      .limit(remainingCount);
+        const now = new Date();
 
-      products = [...products, ...highRatedProducts];
-      }
-  
-      res.json(products);
+        // Tìm các sản phẩm đang trong thời gian giảm giá
+        let products = await Product.find({
+            'discount.percentage': { $gt: 0 },
+            'discount.startDate': { $lte: now },
+            'discount.endDate': { $gte: now }
+        })
+            .populate('sellerId', 'shopName shopAvatar phoneNumber')
+            .sort({ 'discount.percentage': -1 }) // Sắp xếp theo phần trăm giảm giá
+            .limit(10); // Lấy 10 sản phẩm giảm giá cao nhất
+
+        if (products.length < 10) {
+            const remainingCount = 10 - products.length;
+            const highRatedProducts = await Product.find({
+                _id: { $nin: products.map(p => p._id) }, // Exclude already selected products
+            })
+                .populate('sellerId', 'shopName shopAvatar phoneNumber')
+                .sort({ avgRating: -1 })
+                .limit(remainingCount);
+
+            products = [...products, ...highRatedProducts];
+        }
+
+        res.json(products);
     } catch (e) {
-      res.status(500).json({ error: e.message });
+        res.status(500).json({ error: e.message });
     }
-  });
+});
 
 module.exports = productRouter;
