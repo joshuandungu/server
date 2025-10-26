@@ -74,7 +74,7 @@ productRouter.post("/api/rate-product", auth, async (req, res) => {
 //     }
 // });
 
-productRouter.get("/api/deal-of-day", auth, async (req, res) => {
+productRouter.get("/api/deal-of-day", async (req, res) => {
     try {
         const now = new Date();
 
