@@ -315,8 +315,39 @@ userRouter.get("/api/best-sellers", auth, async (req, res) => {
     }
 });
 
+// Add a route to get all products for buyers (with optional category filter)
+userRouter.get("/api/products", auth, async (req, res) => {
+    try {
+        const { category } = req.query;
+        let products;
+        if (category) {
+            products = await Product.find({ category }).populate('sellerId', 'shopName shopAvatar');
+        } else {
+            products = await Product.find({}).populate('sellerId', 'shopName shopAvatar');
+        }
+        res.json(products);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Add a route to get the deal of the day for buyers
+userRouter.get("/api/deal-of-day", auth, async (req, res) => {
+    try {
+        const products = await Product.find({}).populate('sellerId', 'shopName shopAvatar');
+        if (products.length === 0) {
+            return res.json(null);
+        }
+        // Pick a random product for now (can be replaced with more complex logic)
+        const dealOfDay = products[Math.floor(Math.random() * products.length)];
+        res.json(dealOfDay);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Get shop owner data for buyers
-userRouter.get("/api/shop-owner/:sellerId", async (req, res) => {
+userRouter.get("/api/shop-owner/:sellerId", auth, async (req, res) => {
     try {
         const { sellerId } = req.params;
         const shopOwner = await User.findById(sellerId);
@@ -330,7 +361,7 @@ userRouter.get("/api/shop-owner/:sellerId", async (req, res) => {
 });
 
 // Get shop products for buyers
-userRouter.get("/api/shop-products/:sellerId", async (req, res) => {
+userRouter.get("/api/shop-products/:sellerId", auth, async (req, res) => {
     try {
         const { sellerId } = req.params;
         const products = await Product.find({ sellerId });
@@ -341,7 +372,7 @@ userRouter.get("/api/shop-products/:sellerId", async (req, res) => {
 });
 
 // Get shop stats for buyers
-userRouter.get("/api/shop-stats/:sellerId", async (req, res) => {
+userRouter.get("/api/shop-stats/:sellerId", auth, async (req, res) => {
     try {
         const { sellerId } = req.params;
         const totalProducts = await Product.countDocuments({ sellerId });
@@ -369,7 +400,7 @@ userRouter.get("/api/shop-stats/:sellerId", async (req, res) => {
 });
 
 // Public route to get all active sellers for buyers
-userRouter.get("/api/sellers", async (req, res) => {
+userRouter.get("/api/sellers", auth, async (req, res) => {
     try {
         const { top } = req.query;
 
