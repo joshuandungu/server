@@ -600,4 +600,42 @@ adminRouter.get("/admin/category-sales", admin, async (req, res) => {
     }
 });
 
+adminRouter.get("/admin/dashboard-summary", admin, async (req, res) => {
+    try {
+        const [
+            totalUsers,
+            totalSellers,
+            totalOrders,
+            pendingRequests,
+            revenueResult
+        ] = await Promise.all([
+            User.countDocuments({ type: "user" }),
+            User.countDocuments({ type: "seller" }),
+            Order.countDocuments({}),
+            SellerRequest.countDocuments({ status: "pending" }),
+            Order.aggregate([
+                { $match: { status: 3, cancelled: { $ne: true } } },
+                {
+                    $group: {
+                        _id: null,
+                        totalRevenue: { $sum: "$totalPrice" }
+                    }
+                }
+            ])
+        ]);
+
+        const totalRevenue = revenueResult.length > 0 ? revenueResult[0].totalRevenue : 0;
+
+        res.json({
+            totalUsers,
+            totalSellers,
+            totalOrders,
+            pendingRequests,
+            totalRevenue,
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 module.exports = adminRouter;
