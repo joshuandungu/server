@@ -4,12 +4,15 @@ const auth = require("../middlewares/auth");
 const { Product } = require("../models/product");
 const ratingSchema = require("../models/rating");
 
-// Public route to get all products for buyers, can be filtered by category
-productRouter.get("/api/products", async (req, res) => {
+// Private route to get all products for buyers, can be filtered by category
+productRouter.get("/api/products", auth, async (req, res) => {
     try {
         const query = {};
         if (req.query.category) {
             query.category = req.query.category;
+        }
+        if (req.query.sellerId) {
+            query.sellerId = req.query.sellerId;
         }
         const products = await Product.find(query).populate('sellerId', 'shopName shopAvatar phoneNumber');
         res.json(products);
