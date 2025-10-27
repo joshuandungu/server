@@ -198,4 +198,65 @@ sellerRouter.get("/dashboard-overview", seller, async (req, res) => {
     }
 });
 
+// Get all products for a seller
+sellerRouter.get("/get-products", seller, async (req, res) => {
+    try {
+        const products = await Product.find({ sellerId: req.user });
+        res.json(products);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Get shop data (owner and products) for a seller
+sellerRouter.get("/shop-data/:sellerId", seller, async (req, res) => {
+    try {
+        const { sellerId } = req.params;
+        const shopOwner = await User.findById(sellerId);
+        const products = await Product.find({ sellerId: sellerId });
+
+        if (!shopOwner) {
+            return res.status(404).json({ msg: "Shop owner not found" });
+        }
+
+        res.json({ shopOwner, products });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Get shop stats for a seller
+sellerRouter.get("/shop-stats/:sellerId", seller, async (req, res) => {
+    try {
+        const { sellerId } = req.params;
+
+        const [
+            totalProducts,
+            orders,
+            followerCount
+        ] = await Promise.all([
+            Product.countDocuments({ sellerId }),
+            Order.find({ "products.product.sellerId": sellerId, status: 3 }),
+            User.countDocuments({ following: sellerId })
+        ]);
+
+        let totalRating = 0;
+        let ratingCount = 0;
+        orders.forEach(order => {
+            order.products.forEach(product => {
+                if (product.product.sellerId.toString() === sellerId && product.rating) {
+                    totalRating += product.rating;
+                    ratingCount++;
+                }
+            });
+        });
+
+        const avgRating = ratingCount > 0 ? totalRating / ratingCount : 0;
+
+        res.json({ totalProducts, avgRating, followerCount });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 module.exports = sellerRouter;
