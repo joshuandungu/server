@@ -159,4 +159,43 @@ sellerRouter.get("/product-performances", seller, async (req, res) => {
     }
 });
 
+// Get dashboard overview data for a seller
+sellerRouter.get("/dashboard-overview", seller, async (req, res) => {
+    try {
+        const sellerId = req.user;
+
+        // Concurrently fetch all required data
+        const [
+            totalProducts,
+            totalOrders,
+            revenueData,
+            customerData
+        ] = await Promise.all([
+            Product.countDocuments({ sellerId }),
+            Order.countDocuments({ "products.product.sellerId": new mongoose.Types.ObjectId(sellerId) }),
+            Order.aggregate([
+                { $match: { "products.product.sellerId": new mongoose.Types.ObjectId(sellerId), status: 3 } },
+                { $unwind: "$products" },
+                { $match: { "products.product.sellerId": new mongoose.Types.ObjectId(sellerId) } },
+                { $group: { _id: null, totalRevenue: { $sum: { $multiply: ["$products.quantity", "$products.product.finalPrice"] } } } }
+            ]),
+            Order.aggregate([
+                { $match: { "products.product.sellerId": new mongoose.Types.ObjectId(sellerId) } },
+                { $group: { _id: "$userId" } },
+                { $count: "totalCustomers" }
+            ])
+        ]);
+
+        res.json({
+            totalProducts: totalProducts || 0,
+            totalOrders: totalOrders || 0,
+            totalCustomers: customerData.length > 0 ? customerData[0].totalCustomers : 0,
+            totalRevenue: revenueData.length > 0 ? revenueData[0].totalRevenue : 0,
+            conversionRate: totalOrders > 0 ? (totalOrders / (totalProducts > 0 ? totalProducts : 1)) : 0, // Simplified conversion rate
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 module.exports = sellerRouter;
