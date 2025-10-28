@@ -5,6 +5,7 @@ const { Product } = require('../models/product');
 const User = require('../models/user');
 const Order = require("../models/order");
 const Notification = require('../models/notification');
+const mongoose = require('mongoose');
 
 
 // Add product to cart
@@ -364,7 +365,7 @@ userRouter.get("/api/shop-owner/:sellerId", auth, async (req, res) => {
 userRouter.get("/api/shop-products/:sellerId", auth, async (req, res) => {
     try {
         const { sellerId } = req.params;
-        const products = await Product.find({ sellerId });
+        const products = await Product.find({ sellerId: mongoose.Types.ObjectId(sellerId) });
         res.json(products);
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -375,8 +376,8 @@ userRouter.get("/api/shop-products/:sellerId", auth, async (req, res) => {
 userRouter.get("/api/shop-stats/:sellerId", auth, async (req, res) => {
     try {
         const { sellerId } = req.params;
-        const totalProducts = await Product.countDocuments({ sellerId });
-        const orders = await Order.find({ "products.product.sellerId": sellerId, status: 3 });
+        const totalProducts = await Product.countDocuments({ sellerId: mongoose.Types.ObjectId(sellerId) });
+        const orders = await Order.find({ "products.product.sellerId": mongoose.Types.ObjectId(sellerId), status: 3 });
         let totalRating = 0;
         let ratingCount = 0;
         orders.forEach(order => {
@@ -388,7 +389,7 @@ userRouter.get("/api/shop-stats/:sellerId", auth, async (req, res) => {
             });
         });
         const avgRating = ratingCount > 0 ? totalRating / ratingCount : 0;
-        const followerCount = await User.countDocuments({ following: sellerId });
+        const followerCount = await User.countDocuments({ following: mongoose.Types.ObjectId(sellerId) });
         res.json({
             totalProducts,
             avgRating,
@@ -402,17 +403,7 @@ userRouter.get("/api/shop-stats/:sellerId", auth, async (req, res) => {
 // Public route to get all active sellers for buyers
 userRouter.get("/api/sellers", auth, async (req, res) => {
     try {
-        const { top } = req.query;
-
-        if (top === 'true') {
-            // Logic to get top sellers (e.g., by average rating)
-            const topSellers = await User.find({ type: "seller", status: "active" })
-                .sort({ avgRating: -1 }) // Assuming you have an avgRating field
-                .limit(10);
-            return res.json(topSellers);
-        }
-
-        // Default: get all active sellers
+        // No criteria for top sellers, return all active sellers
         const sellers = await User.find({ type: "seller", status: "active" });
         res.json(sellers);
 
